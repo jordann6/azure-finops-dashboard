@@ -17,3 +17,11 @@ output "untagged_storage_account_id" {
 output "log_analytics_workspace_id" {
   value = module.sample_workload.log_analytics_workspace_id
 }
+
+output "cosmos_account_endpoint" {
+  value = module.cosmos.account_endpoint
+}
+
+output "cosmos_database_name" {
+  value = module.cosmos.database_name
+}

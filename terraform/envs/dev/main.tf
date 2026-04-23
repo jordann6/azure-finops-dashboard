@@ -27,3 +27,13 @@ module "sample_workload" {
   environment         = local.environment
   common_tags         = local.common_tags
 }
+
+module "cosmos" {
+  source = "../../modules/cosmos"
+
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  project             = local.project
+  environment         = local.environment
+  common_tags         = local.common_tags
+}
