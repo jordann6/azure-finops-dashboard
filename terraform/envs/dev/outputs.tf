@@ -25,3 +25,11 @@ output "cosmos_account_endpoint" {
 output "cosmos_database_name" {
   value = module.cosmos.database_name
 }
+
+output "function_app_name" {
+  value = module.functions.function_app_name
+}
+
+output "function_app_hostname" {
+  value = module.functions.function_app_hostname
+}

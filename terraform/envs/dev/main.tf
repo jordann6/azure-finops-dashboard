@@ -37,3 +37,18 @@ module "cosmos" {
   environment         = local.environment
   common_tags         = local.common_tags
 }
+
+module "functions" {
+  source = "../../modules/functions"
+
+  resource_group_name        = azurerm_resource_group.this.name
+  location                   = azurerm_resource_group.this.location
+  project                    = local.project
+  environment                = local.environment
+  common_tags                = local.common_tags
+  cosmos_account_endpoint    = module.cosmos.account_endpoint
+  cosmos_account_name        = module.cosmos.account_name
+  cosmos_database_name       = module.cosmos.database_name
+  log_analytics_workspace_id = module.sample_workload.log_analytics_workspace_id
+  subscription_id            = "9c644a73-5dc1-4bfe-9e90-91865014cdd2"
+}
