@@ -17,3 +17,13 @@ resource "azurerm_resource_group" "this" {
   location = local.location
   tags     = local.common_tags
 }
+
+module "sample_workload" {
+  source = "../../modules/sample_workload"
+
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  project             = local.project
+  environment         = local.environment
+  common_tags         = local.common_tags
+}
