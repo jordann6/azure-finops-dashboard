@@ -4,7 +4,65 @@ Portfolio project demonstrating cloud financial operations on Azure. Covers cost
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture.svg)
+```mermaid
+flowchart LR
+    subgraph EXT["External"]
+        Browser["🖥️ Browser\nReact SPA"]
+        CostAPI["Azure Cost Mgmt API\nmanagement.azure.com"]
+    end
+
+    subgraph SUB["Azure Subscription"]
+        subgraph RG["rg-finops-dev · East US"]
+            SWA["Static Web Apps\nReact · Azure CDN"]
+
+            subgraph FN["Azure Functions · .NET 8 · Consumption Plan"]
+                HTTP["HTTP Triggers\n/api/costs/daily\n/api/costs/by-resource\n/api/tags/hygiene\n/api/anomalies\n/api/forecasts"]
+                TMR["Timer Triggers\nCostIngestion · 06:00 UTC\nAnomalyDetection · 06:30 UTC\nForecast · 07:00 UTC"]
+            end
+
+            subgraph CDB["Cosmos DB · SQL API · Free Tier · RBAC-only"]
+                direction TB
+                DC[("daily-costs\n/resourceId")]
+                AN[("anomalies\n/detectedDate")]
+                FC[("forecasts\n/forecastDate")]
+                BG[("budgets\n/budgetName")]
+            end
+
+            MI["Managed Identity\nCost Mgmt Reader · Reader\nCosmos DB Data Contributor"]
+
+            subgraph OBS["Observability"]
+                AI["Application Insights"]
+                LA["Log Analytics · 30d"]
+            end
+
+            ST["Storage Account\nFunctions Runtime · LRS"]
+        end
+    end
+
+    Browser -->|"HTTPS / CDN"| SWA
+    Browser -.->|"fetch() API"| HTTP
+    SWA -->|"JSON REST"| HTTP
+    HTTP -->|read| DC & AN & FC
+    TMR -->|"query costs"| CostAPI
+    TMR -->|upsert| DC & AN & FC
+    HTTP & TMR -.->|telemetry| AI
+    AI -->|workspace| LA
+    MI -.->|"RBAC"| FN
+
+    classDef azureBlue fill:#0078D4,stroke:#005A9E,color:#fff
+    classDef fnStyle fill:#FEF3C7,stroke:#F59E0B,color:#92400E
+    classDef cosmosStyle fill:#DBEAFE,stroke:#0072C6,color:#1E3A5F
+    classDef purpleStyle fill:#EDE9FE,stroke:#7C3AED,color:#4C1D95
+    classDef greenStyle fill:#DCFCE7,stroke:#16A34A,color:#14532D
+    classDef extStyle fill:#F8FAFC,stroke:#94A3B8,color:#374151
+
+    class SWA,LA,ST azureBlue
+    class HTTP,TMR fnStyle
+    class DC,AN,FC,BG cosmosStyle
+    class AI purpleStyle
+    class MI greenStyle
+    class Browser,CostAPI extStyle
+```
 
 Timer triggered Azure Functions (C# .NET 8 isolated worker) ingest cost data from the Azure Cost Management REST API on a daily schedule, write normalized records to Cosmos DB, then run anomaly detection (z score based) and linear regression forecasting against the stored data. HTTP triggered Functions expose a REST API consumed by a React single page application hosted on Azure Static Web Apps.
 
