@@ -17,14 +17,14 @@ export default function TagHygiene({ apiBase }) {
   if (error) return <div className="error">Error: {error}</div>;
   if (!data) return <div className="loading">No tag data available.</div>;
 
-  const complianceColor = data.compliancePercent >= 80 ? 'green' : data.compliancePercent >= 50 ? 'red' : 'red';
+  const complianceColor = data.compliancePercent >= 80 ? '#059669' : data.compliancePercent >= 50 ? '#D97706' : '#DC2626';
 
   return (
     <div>
       <div className="metric-cards">
         <div className="metric-card">
           <div className="label">Compliance</div>
-          <div className={`value ${complianceColor}`}>{data.compliancePercent}%</div>
+          <div className="value" style={{ color: complianceColor }}>{data.compliancePercent}%</div>
         </div>
         <div className="metric-card">
           <div className="label">Total Resources</div>

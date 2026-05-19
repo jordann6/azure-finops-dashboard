@@ -48,7 +48,8 @@ module "functions" {
   common_tags                = local.common_tags
   cosmos_account_endpoint    = module.cosmos.account_endpoint
   cosmos_account_name        = module.cosmos.account_name
+  cosmos_account_id          = module.cosmos.account_id
   cosmos_database_name       = module.cosmos.database_name
   log_analytics_workspace_id = module.sample_workload.log_analytics_workspace_id
-  subscription_id            = "9c644a73-5dc1-4bfe-9e90-91865014cdd2"
+  subscription_id            = var.subscription_id
 }

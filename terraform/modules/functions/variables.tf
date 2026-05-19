@@ -26,6 +26,10 @@ variable "cosmos_account_name" {
   type = string
 }
 
+variable "cosmos_account_id" {
+  type = string
+}
+
 variable "cosmos_database_name" {
   type = string
 }

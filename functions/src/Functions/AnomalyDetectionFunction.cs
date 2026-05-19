@@ -7,10 +7,17 @@ namespace FinOpsFunctions.Functions;
 public class AnomalyDetectionFunction
 {
     private readonly ILogger<AnomalyDetectionFunction> _logger;
+    private readonly AnomalyDetectionService _detectionService;
+    private readonly CosmosService _cosmos;
 
-    public AnomalyDetectionFunction(ILogger<AnomalyDetectionFunction> logger)
+    public AnomalyDetectionFunction(
+        ILogger<AnomalyDetectionFunction> logger,
+        AnomalyDetectionService detectionService,
+        CosmosService cosmos)
     {
         _logger = logger;
+        _detectionService = detectionService;
+        _cosmos = cosmos;
     }
 
     [Function("AnomalyDetection")]
@@ -18,20 +25,12 @@ public class AnomalyDetectionFunction
     {
         _logger.LogInformation("Anomaly detection started at {time}", DateTime.UtcNow);
 
-        var cosmosEndpoint = Environment.GetEnvironmentVariable("CosmosDb__Endpoint")
-            ?? throw new InvalidOperationException("CosmosDb__Endpoint not configured");
-        var databaseName = Environment.GetEnvironmentVariable("CosmosDb__DatabaseName")
-            ?? throw new InvalidOperationException("CosmosDb__DatabaseName not configured");
-
-        var cosmosService = new CosmosService(cosmosEndpoint, databaseName);
-        var detectionService = new AnomalyDetectionService(cosmosService);
-
-        var anomalies = await detectionService.DetectAnomaliesAsync();
+        var anomalies = await _detectionService.DetectAnomaliesAsync();
         _logger.LogInformation("Detected {count} anomalies", anomalies.Count);
 
         foreach (var anomaly in anomalies)
         {
-            await cosmosService.UpsertAnomalyAsync(anomaly);
+            await _cosmos.UpsertAnomalyAsync(anomaly);
             _logger.LogWarning("Anomaly: {resource} - Expected {expected}, Actual {actual} ({severity})",
                 anomaly.ResourceName, anomaly.ExpectedCost, anomaly.ActualCost, anomaly.Severity);
         }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart, Line } from 'recharts';
 
 export default function Forecasts({ apiBase }) {
   const [data, setData] = useState(null);

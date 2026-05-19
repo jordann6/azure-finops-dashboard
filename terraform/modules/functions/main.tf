@@ -1,10 +1,12 @@
 resource "azurerm_storage_account" "functions" {
-  name                     = "stfinopsfunc${var.environment}"
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  min_tls_version          = "TLS1_2"
+  name                            = "stfinopsfunc${var.environment}"
+  resource_group_name             = var.resource_group_name
+  location                        = var.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  min_tls_version                 = "TLS1_2"
+  https_traffic_only_enabled      = true
+  allow_nested_items_to_be_public = false
 
   tags = merge(var.common_tags, {
     purpose = "functions_storage"
@@ -56,6 +58,9 @@ resource "azurerm_linux_function_app" "this" {
     "CosmosDb__Endpoint"     = var.cosmos_account_endpoint
     "CosmosDb__DatabaseName" = var.cosmos_database_name
     "Azure__SubscriptionId"  = var.subscription_id
+    # Set to the Static Web Apps URL after deployment to restrict CORS.
+    # Example: "https://your-app.azurestaticapps.net"
+    "CORS_ALLOWED_ORIGIN"    = "*"
   }
 
   tags = var.common_tags
@@ -75,11 +80,11 @@ resource "azurerm_role_assignment" "reader" {
   principal_id         = azurerm_linux_function_app.this.identity[0].principal_id
 }
 
-# Grant the Function App data access to Cosmos DB
+# Grant the Function App data plane access to Cosmos DB (database scope)
 resource "azurerm_cosmosdb_sql_role_assignment" "data_contributor" {
   resource_group_name = var.resource_group_name
   account_name        = var.cosmos_account_name
-  role_definition_id  = "${azurerm_linux_function_app.this.id}/../../../providers/Microsoft.DocumentDB/databaseAccounts/${var.cosmos_account_name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  role_definition_id  = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.DocumentDB/databaseAccounts/${var.cosmos_account_name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   principal_id        = azurerm_linux_function_app.this.identity[0].principal_id
-  scope               = "/dbs/${var.cosmos_database_name}"
+  scope               = "${var.cosmos_account_id}/dbs/${var.cosmos_database_name}"
 }

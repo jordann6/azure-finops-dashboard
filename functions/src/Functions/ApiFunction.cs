@@ -10,37 +10,30 @@ namespace FinOpsFunctions.Functions;
 public class ApiFunction
 {
     private readonly ILogger<ApiFunction> _logger;
+    private readonly CosmosService _cosmos;
+    private readonly TagHygieneService _tagService;
+    private static readonly string _corsOrigin =
+        Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGIN") ?? "*";
 
-    public ApiFunction(ILogger<ApiFunction> logger)
+    public ApiFunction(ILogger<ApiFunction> logger, CosmosService cosmos, TagHygieneService tagService)
     {
         _logger = logger;
-    }
-
-    private (CosmosService cosmos, string subscriptionId) GetServices()
-    {
-        var cosmosEndpoint = Environment.GetEnvironmentVariable("CosmosDb__Endpoint")
-            ?? throw new InvalidOperationException("CosmosDb__Endpoint not configured");
-        var databaseName = Environment.GetEnvironmentVariable("CosmosDb__DatabaseName")
-            ?? throw new InvalidOperationException("CosmosDb__DatabaseName not configured");
-        var subscriptionId = Environment.GetEnvironmentVariable("Azure__SubscriptionId")
-            ?? throw new InvalidOperationException("Azure__SubscriptionId not configured");
-
-        return (new CosmosService(cosmosEndpoint, databaseName), subscriptionId);
+        _cosmos = cosmos;
+        _tagService = tagService;
     }
 
     [Function("GetDailyCosts")]
     public async Task<HttpResponseData> GetDailyCosts(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "costs/daily")] HttpRequestData req)
     {
-        var (cosmos, _) = GetServices();
         var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
 
         var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-        if (queryParams["startDate"] != null) startDate = queryParams["startDate"]!;
-        if (queryParams["endDate"] != null) endDate = queryParams["endDate"]!;
+        if (queryParams["startDate"] is string sd && IsValidDate(sd)) startDate = sd;
+        if (queryParams["endDate"] is string ed && IsValidDate(ed)) endDate = ed;
 
-        var costs = await cosmos.GetCostsByDateRangeAsync(startDate, endDate);
+        var costs = await _cosmos.GetCostsByDateRangeAsync(startDate, endDate);
 
         var dailyTotals = costs
             .GroupBy(c => c.UsageDate)
@@ -55,11 +48,10 @@ public class ApiFunction
     public async Task<HttpResponseData> GetCostsByResource(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "costs/by-resource")] HttpRequestData req)
     {
-        var (cosmos, _) = GetServices();
         var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
 
-        var costs = await cosmos.GetCostsByDateRangeAsync(startDate, endDate);
+        var costs = await _cosmos.GetCostsByDateRangeAsync(startDate, endDate);
 
         var byResource = costs
             .GroupBy(c => new { c.ResourceName, c.ResourceType })
@@ -80,10 +72,7 @@ public class ApiFunction
     public async Task<HttpResponseData> GetTagHygiene(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "tags/hygiene")] HttpRequestData req)
     {
-        var (_, subscriptionId) = GetServices();
-        var tagService = new TagHygieneService(subscriptionId);
-        var result = await tagService.EvaluateTagComplianceAsync();
-
+        var result = await _tagService.EvaluateTagComplianceAsync();
         return await CreateJsonResponse(req, result);
     }
 
@@ -91,9 +80,7 @@ public class ApiFunction
     public async Task<HttpResponseData> GetAnomalies(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "anomalies")] HttpRequestData req)
     {
-        var (cosmos, _) = GetServices();
-        var anomalies = await cosmos.GetRecentAnomaliesAsync();
-
+        var anomalies = await _cosmos.GetRecentAnomaliesAsync();
         return await CreateJsonResponse(req, anomalies);
     }
 
@@ -101,17 +88,19 @@ public class ApiFunction
     public async Task<HttpResponseData> GetForecasts(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "forecasts")] HttpRequestData req)
     {
-        var (cosmos, _) = GetServices();
-        var forecasts = await cosmos.GetForecastsAsync();
-
+        var forecasts = await _cosmos.GetForecastsAsync();
         return await CreateJsonResponse(req, forecasts);
     }
+
+    private static bool IsValidDate(string date) =>
+        DateTime.TryParseExact(date, "yyyy-MM-dd", null,
+            System.Globalization.DateTimeStyles.None, out _);
 
     private static async Task<HttpResponseData> CreateJsonResponse<T>(HttpRequestData req, T data)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "application/json");
-        response.Headers.Add("Access-Control-Allow-Origin", "*");
+        response.Headers.Add("Access-Control-Allow-Origin", _corsOrigin);
         await response.WriteStringAsync(JsonSerializer.Serialize(data, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

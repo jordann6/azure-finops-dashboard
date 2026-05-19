@@ -7,10 +7,17 @@ namespace FinOpsFunctions.Functions;
 public class CostIngestionFunction
 {
     private readonly ILogger<CostIngestionFunction> _logger;
+    private readonly CosmosService _cosmos;
+    private readonly CostIngestionService _ingestionService;
 
-    public CostIngestionFunction(ILogger<CostIngestionFunction> logger)
+    public CostIngestionFunction(
+        ILogger<CostIngestionFunction> logger,
+        CosmosService cosmos,
+        CostIngestionService ingestionService)
     {
         _logger = logger;
+        _cosmos = cosmos;
+        _ingestionService = ingestionService;
     }
 
     [Function("CostIngestion")]
@@ -18,27 +25,17 @@ public class CostIngestionFunction
     {
         _logger.LogInformation("Cost ingestion started at {time}", DateTime.UtcNow);
 
-        var subscriptionId = Environment.GetEnvironmentVariable("Azure__SubscriptionId")
-            ?? throw new InvalidOperationException("Azure__SubscriptionId not configured");
-        var cosmosEndpoint = Environment.GetEnvironmentVariable("CosmosDb__Endpoint")
-            ?? throw new InvalidOperationException("CosmosDb__Endpoint not configured");
-        var databaseName = Environment.GetEnvironmentVariable("CosmosDb__DatabaseName")
-            ?? throw new InvalidOperationException("CosmosDb__DatabaseName not configured");
-
-        var cosmosService = new CosmosService(cosmosEndpoint, databaseName);
-        var ingestionService = new CostIngestionService(subscriptionId);
-
         var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var startDate = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
 
         _logger.LogInformation("Querying costs from {start} to {end}", startDate, endDate);
 
-        var records = await ingestionService.QueryCostsAsync(startDate, endDate);
+        var records = await _ingestionService.QueryCostsAsync(startDate, endDate);
         _logger.LogInformation("Retrieved {count} cost records", records.Count);
 
         foreach (var record in records)
         {
-            await cosmosService.UpsertCostRecordAsync(record);
+            await _cosmos.UpsertCostRecordAsync(record);
         }
 
         _logger.LogInformation("Cost ingestion completed. Upserted {count} records", records.Count);

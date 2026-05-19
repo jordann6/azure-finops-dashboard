@@ -4,6 +4,8 @@ Portfolio project demonstrating cloud financial operations on Azure. Covers cost
 
 ## Architecture
 
+![Architecture Diagram](docs/architecture.svg)
+
 Timer triggered Azure Functions (C# .NET 8 isolated worker) ingest cost data from the Azure Cost Management REST API on a daily schedule, write normalized records to Cosmos DB, then run anomaly detection (z score based) and linear regression forecasting against the stored data. HTTP triggered Functions expose a REST API consumed by a React single page application hosted on Azure Static Web Apps.
 
 All infrastructure is defined in Terraform with remote state in Azure Storage.
