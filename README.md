@@ -97,31 +97,36 @@ Azure Functions (C# .NET 8, isolated worker), Cosmos DB (SQL API, free tier), Az
 
 ## Infrastructure
 
-9 Terraform modules across backend, sample workload, Cosmos DB, Functions, and observability layers.
+3 reusable Terraform modules under `terraform/modules/`, composed by the `terraform/envs/dev/` environment configuration.
 
-| Module | Resources |
+| Component | Resources |
 |---|---|
-| Backend | Storage account for Terraform remote state |
+| Backend | Azure Storage account for Terraform remote state (configured in `backend.tf`) |
 | Sample Workload | 2 storage accounts (1 tagged, 1 intentionally untagged), Log Analytics workspace |
 | Cosmos DB | Account (free tier), SQL database, 4 containers (daily costs, anomalies, forecasts, budgets) |
-| Functions | Consumption plan, Function App with system assigned managed identity, Functions storage account, Application Insights |
+| Functions | Consumption plan, Function App with system-assigned managed identity, Functions storage account, Application Insights |
 
 ### RBAC and Security
 
-The Function App uses a system assigned managed identity with three role assignments: Cost Management Reader (subscription scope) for cost data access, Reader (subscription scope) for resource metadata and tag evaluation, and Cosmos DB Built in Data Contributor (database scope) for data plane operations. No connection strings or API keys are stored in application settings for Cosmos DB access.
+The Function App uses a system-assigned managed identity with three role assignments: Cost Management Reader (subscription scope) for cost data access, Reader (subscription scope) for resource metadata and tag evaluation, and Cosmos DB Built-in Data Contributor (database scope) for data plane operations.
+
+Additional hardening applied:
+
+- `local_authentication_disabled = true` on the Cosmos DB account — key-based and connection-string auth is disabled at the account level; only RBAC data plane access is accepted
+- `https_traffic_only_enabled = true` and `allow_nested_items_to_be_public = false` on the Functions storage account
+- CORS origin configurable via `CORS_ALLOWED_ORIGIN` app setting (set to the Static Web Apps URL after deployment)
+- Subscription ID managed as a Terraform input variable — not hardcoded in source
 
 ## Project Structure
 
 ```
 azure-finops-dashboard/
   terraform/
-    envs/dev/            # Environment configuration
+    envs/dev/            # Environment configuration and backend.tf
     modules/
-      backend/           # Terraform state storage
       sample_workload/   # Resources generating cost signal
       cosmos/            # Cosmos DB account, database, containers
-      functions/         # Function App, App Service Plan, RBAC
-      observability/     # Application Insights, alerts
+      functions/         # Function App, App Service Plan, RBAC, App Insights
   functions/
     src/
       Models/            # CostRecord, AnomalyRecord, ForecastRecord, TagHygieneResult
