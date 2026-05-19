@@ -7,61 +7,64 @@ Portfolio project demonstrating cloud financial operations on Azure. Covers cost
 ```mermaid
 flowchart LR
     subgraph EXT["External"]
-        Browser["🖥️ Browser\nReact SPA"]
-        CostAPI["Azure Cost Mgmt API\nmanagement.azure.com"]
+        Browser(["Browser"])
+        CostAPI(["Cost Management API\nmanagement.azure.com"])
     end
 
-    subgraph SUB["Azure Subscription"]
-        subgraph RG["rg-finops-dev · East US"]
-            SWA["Static Web Apps\nReact · Azure CDN"]
+    subgraph AZURE["Azure Subscription"]
+        subgraph RG["rg-finops-dev  ·  East US"]
+            SWA["Static Web Apps\nReact  ·  Azure CDN  ·  HTTPS"]
 
-            subgraph FN["Azure Functions · .NET 8 · Consumption Plan"]
-                HTTP["HTTP Triggers\n/api/costs/daily\n/api/costs/by-resource\n/api/tags/hygiene\n/api/anomalies\n/api/forecasts"]
-                TMR["Timer Triggers\nCostIngestion · 06:00 UTC\nAnomalyDetection · 06:30 UTC\nForecast · 07:00 UTC"]
-            end
-
-            subgraph CDB["Cosmos DB · SQL API · Free Tier · RBAC-only"]
+            subgraph FN["Azure Functions  ·  .NET 8  ·  Consumption Plan"]
                 direction TB
-                DC[("daily-costs\n/resourceId")]
-                AN[("anomalies\n/detectedDate")]
-                FC[("forecasts\n/forecastDate")]
-                BG[("budgets\n/budgetName")]
+                HTTP["HTTP Triggers\n/api/costs/daily  ·  /api/costs/by-resource\n/api/tags/hygiene  ·  /api/anomalies  ·  /api/forecasts"]
+                TMR["Timer Triggers\nCostIngestion  06:00  ·  AnomalyDetection  06:30  ·  Forecast  07:00  UTC"]
             end
 
-            MI["Managed Identity\nCost Mgmt Reader · Reader\nCosmos DB Data Contributor"]
+            subgraph DB["Cosmos DB  ·  SQL API  ·  Free Tier  ·  RBAC-only"]
+                direction TB
+                DC[("daily-costs")]
+                AN[("anomalies")]
+                FC[("forecasts")]
+                BG[("budgets")]
+            end
+
+            MI["Managed Identity\nCost Mgmt Reader  ·  Reader  ·  Cosmos DB Data Contributor"]
 
             subgraph OBS["Observability"]
+                direction LR
                 AI["Application Insights"]
-                LA["Log Analytics · 30d"]
+                LA["Log Analytics  ·  30d"]
             end
 
-            ST["Storage Account\nFunctions Runtime · LRS"]
+            ST["Storage Account  ·  Functions Runtime  ·  LRS"]
         end
     end
 
-    Browser -->|"HTTPS / CDN"| SWA
-    Browser -.->|"fetch() API"| HTTP
-    SWA -->|"JSON REST"| HTTP
-    HTTP -->|read| DC & AN & FC
-    TMR -->|"query costs"| CostAPI
-    TMR -->|upsert| DC & AN & FC
-    HTTP & TMR -.->|telemetry| AI
-    AI -->|workspace| LA
-    MI -.->|"RBAC"| FN
+    Browser    -->|"HTTPS"| SWA
+    SWA        -->|"REST"| HTTP
+    HTTP       -->|"read"| DC & AN & FC
+    TMR        -->|"query costs"| CostAPI
+    TMR        -->|"upsert"| DC & AN & FC
+    HTTP & TMR -.->|"telemetry"| AI
+    AI         -->|"workspace"| LA
+    MI         -. "RBAC" .-> FN
 
-    classDef azureBlue fill:#0078D4,stroke:#005A9E,color:#fff
-    classDef fnStyle fill:#FEF3C7,stroke:#F59E0B,color:#92400E
-    classDef cosmosStyle fill:#DBEAFE,stroke:#0072C6,color:#1E3A5F
-    classDef purpleStyle fill:#EDE9FE,stroke:#7C3AED,color:#4C1D95
-    classDef greenStyle fill:#DCFCE7,stroke:#16A34A,color:#14532D
-    classDef extStyle fill:#F8FAFC,stroke:#94A3B8,color:#374151
+    classDef swaStyle   fill:#0078D4,stroke:#005A9E,color:#fff,font-weight:bold
+    classDef fnStyle    fill:#FFFBEB,stroke:#F59E0B,color:#78350F,font-weight:bold
+    classDef dbStyle    fill:#EFF6FF,stroke:#0072C6,color:#1E40AF
+    classDef obsStyle   fill:#F5F3FF,stroke:#7C3AED,color:#4C1D95
+    classDef idStyle    fill:#F0FDF4,stroke:#16A34A,color:#14532D
+    classDef extStyle   fill:#F8FAFC,stroke:#CBD5E1,color:#475569,font-style:italic
+    classDef infraStyle fill:#F0F9FF,stroke:#0EA5E9,color:#0C4A6E
 
-    class SWA,LA,ST azureBlue
+    class SWA swaStyle
     class HTTP,TMR fnStyle
-    class DC,AN,FC,BG cosmosStyle
-    class AI purpleStyle
-    class MI greenStyle
+    class DC,AN,FC,BG dbStyle
+    class AI,LA obsStyle
+    class MI idStyle
     class Browser,CostAPI extStyle
+    class ST infraStyle
 ```
 
 Timer triggered Azure Functions (C# .NET 8 isolated worker) ingest cost data from the Azure Cost Management REST API on a daily schedule, write normalized records to Cosmos DB, then run anomaly detection (z score based) and linear regression forecasting against the stored data. HTTP triggered Functions expose a REST API consumed by a React single page application hosted on Azure Static Web Apps.
