@@ -6,11 +6,13 @@ export default function TagHygiene({ apiBase }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${apiBase}/tags/hygiene`)
+    const controller = new AbortController();
+    fetch(`${apiBase}/tags/hygiene`, { signal: controller.signal })
       .then(res => res.json())
       .then(setData)
-      .catch(err => setError(err.message))
+      .catch(err => { if (err.name !== 'AbortError') setError(err.message); })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [apiBase]);
 
   if (loading) return <div className="loading">Evaluating tag compliance...</div>;

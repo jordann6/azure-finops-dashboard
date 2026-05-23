@@ -7,11 +7,13 @@ export default function DailyCosts({ apiBase }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${apiBase}/costs/daily`)
+    const controller = new AbortController();
+    fetch(`${apiBase}/costs/daily`, { signal: controller.signal })
       .then(res => res.json())
       .then(setData)
-      .catch(err => setError(err.message))
+      .catch(err => { if (err.name !== 'AbortError') setError(err.message); })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [apiBase]);
 
   if (loading) return <div className="loading">Loading daily costs...</div>;

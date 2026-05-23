@@ -26,7 +26,7 @@ public class CostIngestionFunction
         _logger.LogInformation("Cost ingestion started at {time}", DateTime.UtcNow);
 
         var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-        var startDate = DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-dd");
+        var startDate = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
 
         _logger.LogInformation("Querying costs from {start} to {end}", startDate, endDate);
 
