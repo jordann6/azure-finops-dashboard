@@ -4,6 +4,8 @@ Portfolio project demonstrating cloud financial operations on Azure. Covers cost
 
 ## Architecture
 
+![Architecture](docs/architecture.png)
+
 ```mermaid
 flowchart LR
     subgraph EXT["External"]
