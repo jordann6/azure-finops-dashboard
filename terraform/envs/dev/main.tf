@@ -59,7 +59,7 @@ module "functions" {
 resource "azurerm_monitor_action_group" "budget_alerts" {
   name                = "ag-${local.project}-budget-${local.environment}"
   resource_group_name = azurerm_resource_group.this.name
-  short_name          = "finops-budget"
+  short_name          = "finopsbudget"
   tags                = local.common_tags
 
   email_receiver {
