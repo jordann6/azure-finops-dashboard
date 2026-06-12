@@ -1,5 +1,7 @@
 # Azure FinOps Cost Visibility Dashboard
 
+[![Validate](https://github.com/jordann6/azure-finops-dashboard/actions/workflows/validate.yml/badge.svg)](https://github.com/jordann6/azure-finops-dashboard/actions/workflows/validate.yml)
+
 Portfolio project demonstrating cloud financial operations on Azure. Covers cost visibility, tagging hygiene enforcement, anomaly detection, budget forecasting, and a React dashboard for visualization.
 
 ## Architecture
