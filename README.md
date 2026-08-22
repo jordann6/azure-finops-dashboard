@@ -2,7 +2,7 @@
 
 [![Validate](https://github.com/jordann6/azure-finops-dashboard/actions/workflows/validate.yml/badge.svg)](https://github.com/jordann6/azure-finops-dashboard/actions/workflows/validate.yml)
 
-Portfolio project demonstrating cloud financial operations on Azure. Covers cost visibility, tagging hygiene enforcement, anomaly detection, budget forecasting, and a React dashboard for visualization.
+Portfolio project demonstrating cloud financial operations on Azure. Covers cost visibility, cost allocation by tag (chargeback), Azure Advisor cost optimization, tagging hygiene, Azure Policy tag governance, anomaly detection, budget forecasting, and a React dashboard for visualization.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ Portfolio project demonstrating cloud financial operations on Azure. Covers cost
 flowchart LR
     subgraph EXT["External"]
         Browser(["Browser"])
-        CostAPI(["Cost Management API\nmanagement.azure.com"])
+        CostAPI(["Cost Management + Advisor API\nmanagement.azure.com"])
     end
 
     subgraph AZURE["Azure Subscription"]
@@ -21,9 +21,11 @@ flowchart LR
 
             subgraph FN["Azure Functions  ·  .NET 8  ·  Consumption Plan"]
                 direction TB
-                HTTP["HTTP Triggers\n/api/costs/daily  ·  /api/costs/by-resource\n/api/tags/hygiene  ·  /api/anomalies  ·  /api/forecasts"]
+                HTTP["HTTP Triggers\n/api/costs/daily  ·  /api/costs/by-resource  ·  /api/costs/by-tag\n/api/optimization/waste  ·  /api/tags/hygiene  ·  /api/anomalies  ·  /api/forecasts"]
                 TMR["Timer Triggers\nCostIngestion  06:00  ·  AnomalyDetection  06:30  ·  Forecast  07:00  UTC"]
             end
+
+            POL["Azure Policy\nAudit: require cost_center tag"]
 
             subgraph DB["Cosmos DB  ·  SQL API  ·  Free Tier  ·  RBAC-only"]
                 direction TB
@@ -48,11 +50,13 @@ flowchart LR
     Browser    -->|"HTTPS"| SWA
     SWA        -->|"REST"| HTTP
     HTTP       -->|"read"| DC & AN & FC
+    HTTP       -->|"cost-by-tag · advisor"| CostAPI
     TMR        -->|"query costs"| CostAPI
     TMR        -->|"upsert"| DC & AN & FC
     HTTP & TMR -.->|"telemetry"| AI
     AI         -->|"workspace"| LA
     MI         -. "RBAC" .-> FN
+    POL        -.->|"audit"| RG
 
     classDef swaStyle   fill:#0078D4,stroke:#005A9E,color:#fff,font-weight:bold
     classDef fnStyle    fill:#FFFBEB,stroke:#F59E0B,color:#78350F,font-weight:bold
@@ -67,6 +71,7 @@ flowchart LR
     class DC,AN,FC,BG dbStyle
     class AI,LA obsStyle
     class MI idStyle
+    class POL idStyle
     class Browser,CostAPI extStyle
     class ST infraStyle
 ```
@@ -86,14 +91,23 @@ Runs at 06:30 UTC. Calculates rolling 30 day mean and standard deviation per res
 **Forecasting**
 Runs at 07:00 UTC. Computes a 14 day cost projection using linear trend estimation over the trailing 30 day window, with confidence intervals derived from historical variance. Requires a minimum of 7 days of data.
 
+**Cost Allocation by Tag (chargeback)**
+A live Cost Management query groups the last 30 days of spend by a cost allocation tag (default `project`) so the dashboard answers "what does each project/owner cost," not just "what does each resource cost." Untagged spend is surfaced under `(untagged)`, making unallocated cost visible.
+
+**Optimization (Azure Advisor)**
+Reads Azure Advisor cost recommendations (idle/underused resources, right-sizing, reservation purchases), each with an estimated monthly saving, and totals the savings left on the table. This is the Azure-native equivalent of scanning for unattached disks and idle public IPs plus reservation coverage.
+
 **Tag Hygiene**
-Evaluates all subscription resources against a required tag policy (project, environment, owner). Reports compliance percentage and surfaces specific resources with missing tags.
+Evaluates all subscription resources against a required tag policy (project, environment, owner, cost_center). Reports compliance percentage and surfaces specific resources with missing tags.
+
+**Tag Governance (Azure Policy)**
+A custom Azure Policy definition audits every taggable resource for the `cost_center` tag, assigned at resource-group scope. It uses the **Audit** effect (not Deny/Modify) so it flags non-compliance in the Policy compliance view without blocking or auto-fixing the intentionally-untagged demo resource. This is the control-plane governance layer that complements the after-the-fact Tag Hygiene report.
 
 **REST API**
-Five HTTP endpoints exposed via Azure Functions: /api/costs/daily, /api/costs/by-resource, /api/tags/hygiene, /api/anomalies, /api/forecasts. All return JSON with CORS headers for frontend consumption.
+Seven HTTP endpoints exposed via Azure Functions: /api/costs/daily, /api/costs/by-resource, /api/costs/by-tag, /api/optimization/waste, /api/tags/hygiene, /api/anomalies, /api/forecasts. All return JSON with CORS headers for frontend consumption.
 
 **Frontend**
-React SPA with Recharts visualizations. Tabbed interface covering daily cost trends (bar chart), cost breakdown by resource (pie chart and table), tag compliance metrics, anomaly findings, and forecast projections with confidence bands.
+React SPA with Recharts visualizations. Tabbed interface covering daily cost trends (bar chart), cost breakdown by resource (pie chart and table), spend by owner (tag-grouped bar chart), optimization recommendations, tag compliance metrics, anomaly findings, and forecast projections with confidence bands.
 
 ## Tech Stack
 
@@ -109,10 +123,12 @@ Azure Functions (C# .NET 8, isolated worker), Cosmos DB (SQL API, free tier), Az
 | Sample Workload | 2 storage accounts (1 tagged, 1 intentionally untagged), Log Analytics workspace |
 | Cosmos DB | Account (free tier), SQL database, 4 containers (daily costs, anomalies, forecasts, budgets) |
 | Functions | Consumption plan, Function App with system-assigned managed identity, Functions storage account, Application Insights |
+| Governance | Custom Azure Policy definition (Audit: require `cost_center` tag) + resource-group assignment |
+| Budget | Subscription consumption budget with Monitor action group (80% forecast / 100% actual email alerts) |
 
 ### RBAC and Security
 
-The Function App uses a system-assigned managed identity with three role assignments: Cost Management Reader (subscription scope) for cost data access, Reader (subscription scope) for resource metadata and tag evaluation, and Cosmos DB Built-in Data Contributor (database scope) for data plane operations.
+The Function App uses a system-assigned managed identity with three role assignments: Cost Management Reader (subscription scope) for cost and Advisor data access, Reader (subscription scope) for resource metadata, tag evaluation, and Advisor recommendations, and Cosmos DB Built-in Data Contributor (database scope) for data plane operations.
 
 Additional hardening applied:
 
@@ -178,11 +194,17 @@ cd functions/src
 func azure functionapp publish <function-app-name>
 ```
 
+> **Subscription prerequisite — App Service quota.** The Function App runs on a Linux Consumption (`Y1`) plan, which needs App Service compute quota. Some subscriptions (free/sponsored) have a **"Total VMs" quota of 0**, in which case `terraform apply` fails on the service plan with `401 ... Operation cannot be completed without additional quota`. This is subscription-wide (a region change does not help); request an App Service quota increase through Azure support before deploying. The rest of the stack (resource group, Cosmos, storage, Log Analytics, budget, and the Azure Policy governance layer) deploys independently of this.
+
 ## FinOps Principles Demonstrated
 
 **Visibility**: Daily cost ingestion with resource level granularity, breakdown by resource type and resource group
 
-**Tagging Governance**: Automated compliance scanning against required tag policies, surfacing untagged resources with specific missing tag details
+**Cost Allocation**: Spend grouped by cost allocation tag (chargeback view), with unallocated/untagged spend made explicit
+
+**Tagging Governance**: Two layers, control-plane and reporting, an Azure Policy Audit assignment that flags resources missing the `cost_center` tag, plus automated compliance scanning that surfaces untagged resources with specific missing tag details
+
+**Cost Optimization**: Azure Advisor cost recommendations (idle resources, right-sizing, reservations) surfaced with estimated monthly savings
 
 **Anomaly Detection**: Statistical outlier identification using z score analysis, severity tiering, historical deviation tracking
 

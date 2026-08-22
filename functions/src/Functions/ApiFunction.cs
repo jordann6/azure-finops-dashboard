@@ -12,14 +12,25 @@ public class ApiFunction
     private readonly ILogger<ApiFunction> _logger;
     private readonly CosmosService _cosmos;
     private readonly TagHygieneService _tagService;
+    private readonly CostIngestionService _ingestionService;
+    private readonly AdvisorService _advisorService;
     private static readonly string _corsOrigin =
         Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGIN") ?? "*";
+    private static readonly string _costTagKey =
+        Environment.GetEnvironmentVariable("COST_TAG_KEY") ?? "project";
 
-    public ApiFunction(ILogger<ApiFunction> logger, CosmosService cosmos, TagHygieneService tagService)
+    public ApiFunction(
+        ILogger<ApiFunction> logger,
+        CosmosService cosmos,
+        TagHygieneService tagService,
+        CostIngestionService ingestionService,
+        AdvisorService advisorService)
     {
         _logger = logger;
         _cosmos = cosmos;
         _tagService = tagService;
+        _ingestionService = ingestionService;
+        _advisorService = advisorService;
     }
 
     [Function("GetDailyCosts")]
@@ -66,6 +77,34 @@ public class ApiFunction
             .ToList();
 
         return await CreateJsonResponse(req, byResource);
+    }
+
+    [Function("GetCostsByTag")]
+    public async Task<HttpResponseData> GetCostsByTag(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "costs/by-tag")] HttpRequestData req)
+    {
+        var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
+
+        var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        var tagKey = queryParams["tagKey"] is string tk && !string.IsNullOrWhiteSpace(tk) ? tk : _costTagKey;
+
+        var byTag = await _ingestionService.QueryCostsByTagAsync(startDate, endDate, tagKey);
+        return await CreateJsonResponse(req, new { tagKey, costs = byTag });
+    }
+
+    [Function("GetOptimization")]
+    public async Task<HttpResponseData> GetOptimization(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "optimization/waste")] HttpRequestData req)
+    {
+        var recommendations = await _advisorService.GetCostRecommendationsAsync();
+        var totalMonthly = recommendations.Sum(r => r.EstMonthlySavings);
+        return await CreateJsonResponse(req, new
+        {
+            totalEstMonthlySavings = totalMonthly,
+            count = recommendations.Count,
+            recommendations
+        });
     }
 
     [Function("GetTagHygiene")]

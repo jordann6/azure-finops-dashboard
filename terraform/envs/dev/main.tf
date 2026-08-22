@@ -4,11 +4,15 @@ locals {
   location    = "eastus"
   owner       = "jordann6"
 
+  # cost_center / team are the "who to bill" dimensions — owner is a person,
+  # not a billing bucket. cost_center is the tag the Azure Policy audits for.
   common_tags = {
     project     = local.project
     environment = local.environment
     owner       = local.owner
     managed_by  = "terraform"
+    cost_center = var.cost_center
+    team        = var.team
   }
 }
 

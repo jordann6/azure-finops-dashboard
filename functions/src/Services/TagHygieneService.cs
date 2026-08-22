@@ -9,7 +9,7 @@ public class TagHygieneService
 {
     private readonly ArmClient _armClient;
     private readonly string _subscriptionId;
-    private readonly List<string> _requiredTags = new() { "project", "environment", "owner" };
+    private readonly List<string> _requiredTags = new() { "project", "environment", "owner", "cost_center" };
 
     public TagHygieneService(string subscriptionId)
     {

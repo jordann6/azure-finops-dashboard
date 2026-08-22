@@ -58,9 +58,11 @@ resource "azurerm_linux_function_app" "this" {
     "CosmosDb__Endpoint"     = var.cosmos_account_endpoint
     "CosmosDb__DatabaseName" = var.cosmos_database_name
     "Azure__SubscriptionId"  = var.subscription_id
+    # Cost allocation tag the /costs/by-tag endpoint groups spend by.
+    "COST_TAG_KEY" = "project"
     # Set to the Static Web Apps URL after deployment to restrict CORS.
     # Example: "https://your-app.azurestaticapps.net"
-    "CORS_ALLOWED_ORIGIN"    = "*"
+    "CORS_ALLOWED_ORIGIN" = "*"
   }
 
   tags = var.common_tags

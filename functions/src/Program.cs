@@ -35,6 +35,13 @@ builder.Services.AddSingleton(sp =>
     return new TagHygieneService(subscriptionId);
 });
 
+builder.Services.AddSingleton(sp =>
+{
+    var subscriptionId = Environment.GetEnvironmentVariable("Azure__SubscriptionId")
+        ?? throw new InvalidOperationException("Azure__SubscriptionId not configured");
+    return new AdvisorService(subscriptionId);
+});
+
 builder.Services.AddSingleton<AnomalyDetectionService>();
 builder.Services.AddSingleton<ForecastService>();
 
