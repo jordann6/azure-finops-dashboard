@@ -28,7 +28,7 @@ with Diagram(
         swa = StaticApps("Static Web Apps\nReact + Recharts")
 
         with Cluster("Azure Functions  ·  .NET 8  ·  Consumption"):
-            http_fn = FunctionApps("HTTP Triggers\n/costs/daily · /costs/by-resource\n/costs/by-tag · /optimization/waste\n/tags/hygiene · /anomalies · /forecasts")
+            http_fn = FunctionApps("HTTP Triggers\n/costs/daily · /costs/by-resource\n/costs/by-tag · /optimization/waste\n/tags/hygiene · /anomalies · /forecasts\n/focus (FOCUS schema)")
             timer_fn = FunctionApps("Timer Triggers\nCostIngestion 06:00\nAnomalyDetection 06:30\nForecast 07:00 UTC")
 
         with Cluster("Cosmos DB  ·  Free Tier  ·  RBAC-only"):

@@ -21,7 +21,7 @@ flowchart LR
 
             subgraph FN["Azure Functions  ·  .NET 8  ·  Consumption Plan"]
                 direction TB
-                HTTP["HTTP Triggers\n/api/costs/daily  ·  /api/costs/by-resource  ·  /api/costs/by-tag\n/api/optimization/waste  ·  /api/tags/hygiene  ·  /api/anomalies  ·  /api/forecasts"]
+                HTTP["HTTP Triggers\n/api/costs/daily  ·  /api/costs/by-resource  ·  /api/costs/by-tag\n/api/optimization/waste  ·  /api/tags/hygiene  ·  /api/anomalies\n/api/forecasts  ·  /api/focus (FOCUS)"]
                 TMR["Timer Triggers\nCostIngestion  06:00  ·  AnomalyDetection  06:30  ·  Forecast  07:00  UTC"]
             end
 
@@ -104,7 +104,10 @@ Evaluates all subscription resources against a required tag policy (project, env
 A custom Azure Policy definition audits every taggable resource for the `cost_center` tag, assigned at resource-group scope. It uses the **Audit** effect (not Deny/Modify) so it flags non-compliance in the Policy compliance view without blocking or auto-fixing the intentionally-untagged demo resource. This is the control-plane governance layer that complements the after-the-fact Tag Hygiene report.
 
 **REST API**
-Seven HTTP endpoints exposed via Azure Functions: /api/costs/daily, /api/costs/by-resource, /api/costs/by-tag, /api/optimization/waste, /api/tags/hygiene, /api/anomalies, /api/forecasts. All return JSON with CORS headers for frontend consumption.
+Eight HTTP endpoints exposed via Azure Functions: /api/costs/daily, /api/costs/by-resource, /api/costs/by-tag, /api/optimization/waste, /api/tags/hygiene, /api/anomalies, /api/forecasts, /api/focus. All return JSON with CORS headers for frontend consumption.
+
+**FOCUS normalization**
+/api/focus maps Azure cost records to a [FOCUS](https://focus.finops.org/)-conformant schema (`ProviderName`, `BillingCurrency`, `ChargePeriodStart/End`, `ChargeCategory`, `ServiceName`, `ServiceCategory`, `BilledCost`, `EffectiveCost`, plus `ResourceId`/`SubAccountId`/`Tags`). The AWS dashboard's /focus endpoint emits the same core column set, so Azure and AWS cost data join on one open schema for cross-provider chargeback and unit economics. The mapping is a pure, unit-testable function (`FocusMapper`) with a shared service-category taxonomy, so a "Compute" row means the same thing on both clouds.
 
 **Frontend**
 React SPA with Recharts visualizations. Tabbed interface covering daily cost trends (bar chart), cost breakdown by resource (pie chart and table), spend by owner (tag-grouped bar chart), optimization recommendations, tag compliance metrics, anomaly findings, and forecast projections with confidence bands.

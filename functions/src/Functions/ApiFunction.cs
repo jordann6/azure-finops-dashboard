@@ -131,6 +131,25 @@ public class ApiFunction
         return await CreateJsonResponse(req, forecasts);
     }
 
+    // FOCUS-normalized cost rows. The same column set the AWS dashboard emits at
+    // /focus, so the two clouds join on one schema for cross-provider chargeback
+    // and unit economics.
+    [Function("GetFocus")]
+    public async Task<HttpResponseData> GetFocus(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "focus")] HttpRequestData req)
+    {
+        var endDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var startDate = DateTime.UtcNow.AddDays(-30).ToString("yyyy-MM-dd");
+
+        var queryParams = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        if (queryParams["startDate"] is string sd && IsValidDate(sd)) startDate = sd;
+        if (queryParams["endDate"] is string ed && IsValidDate(ed)) endDate = ed;
+
+        var costs = await _cosmos.GetCostsByDateRangeAsync(startDate, endDate);
+        var focus = costs.Select(FocusMapper.Map).ToList();
+        return await CreateJsonResponse(req, focus);
+    }
+
     private static bool IsValidDate(string date) =>
         DateTime.TryParseExact(date, "yyyy-MM-dd", null,
             System.Globalization.DateTimeStyles.None, out _);
